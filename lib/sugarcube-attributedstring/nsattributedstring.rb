@@ -57,8 +57,8 @@ class NSAttributedString
     foo = NSShadowAttributeName
     foo = NSVerticalGlyphFormAttributeName
     # new iOS 7 text effects
-    foo = NSTextEffectAttributeName
-    foo = NSTextEffectLetterpressStyle
+    # foo = NSTextEffectAttributeName
+    # foo = NSTextEffectLetterpressStyle
     # make sure alignments get compiled
     foo = NSLeftTextAlignment
     foo = NSRightTextAlignment
