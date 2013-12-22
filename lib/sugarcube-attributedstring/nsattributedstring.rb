@@ -136,9 +136,9 @@ class NSAttributedString
     with_attributes({NSVerticalGlyphFormAttributeName => value})
   end
 
-  def letterpress
-    with_attributes({NSTextEffectAttributeName => NSTextEffectLetterpressStyle})
-  end
+  # def letterpress
+  #   with_attributes({NSTextEffectAttributeName => NSTextEffectLetterpressStyle})
+  # end
 
   def with_attributes(attributes)
     retval = NSMutableAttributedString.alloc.initWithAttributedString(self)
