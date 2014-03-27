@@ -287,7 +287,7 @@ UIControl
 -----------
 
 ```ruby
-button = UIButton.alloc.initWithFrame([0, 0, 10, 10])
+button = UIButton.alloc.initWithFrame([[0, 0] ,[10, 10]])
 
 button.on(:touch) { my_code }
 button.on(:touch_up_outside, :touch_cancel) { |event|
@@ -306,32 +306,41 @@ three `:touch` events, calling `button.off(:touch)` will remove all three.
 UITextView
 ------------
 
-You MUST call the `off` methods, because these methods use `NSNotification`s,
-and you must turn off listeners.
+These handlers are functionally identical in usage to the same methods in
+`UIControl`.  They use the `NSNotificationCenter#addObserverForName:object:queue:usingBlock:`
+method, but you do not have to worry about un-observing.  When the text view is
+released, these observers will be removed.
 
-There are two aliases for each event. I prefer the present tense (jQuery-style `on :change`),
-but UIKit prefers past simple (`UITextViewTextDidBeginEditingNotification`).
+There are two aliases for each event, or you can use the event notification. I
+prefer the present tense (jQuery-style `on :change`), but UIKit prefers past
+simple (`:editing_did_begin`).  The notifications, on the other hand, are in
+present simple (`UITextViewTextDidBeginEditingNotification`).  Whatever floats
+your boat.
 
-So these are all the same:
+Anyway, these are all the same:
 
-    :editing_did_begin  :begin
-    :editing_did_change :change
-    :editing_did_end    :end
+    :editing_did_begin   :begin   UITextViewTextDidBeginEditingNotification
+    :editing_did_change  :change  UITextViewTextDidChangeNotification
+    :editing_did_end     :end     UITextViewTextDidEndEditingNotification
 
 ```ruby
 text_view = UITextView.new
-text_view.on :begin do
+text_view.on :begin do |notification|  # <= you have to accept the notification in your block
   p 'wait for it...'
 end
-text_view.on :change do
+text_view.on :change do |notification|
   p text_view.text
 end
-text_view.on :end do
+text_view.on :end do |notification|
   p 'done!'
 end
 
-# later... like in `viewWillDisappear`.  I'll use the alternative aliases here
-text_view.off :editing_did_change, :editing_did_end, :editing_did_begin
+# if you want to remove the block, use the off method
+text_view.off :editing_did_change
+# or
+text_view.off :change
+# or
+text_view.off UITextViewTextDidChangeNotification
 ```
 
 Gestures
@@ -474,10 +483,16 @@ image_ab = image_a << image_b
 UIImage.canvas([100, 100]) do |context|  # opaque: false, scale: UIScreen.mainScreen.scale
   # draw here!
 end
+
 # use an image as a background to draw on
 image.draw do |context|
   # draw here!
 end
+
+# size
+image = Image.canvas(size: [10, 20])
+image.width  # => 10
+image.height  # => 20
 ```
 
 ###### CIFilter additions
@@ -805,6 +820,32 @@ toolbar.items = [
 ]
 ```
 
+###### UITabBarItem
+
+Easy to create system or custom `UITabBarItem`s.
+
+```ruby
+UITabBarItem.titled('My Title')
+# with optional :image and :selected_image options:
+UITabBarItem.titled('My Title', image: 'my_icon', selected_image: 'my_icon_selected')
+# also supports :tag and :badge
+UITabBarItem.titled('My Title', tag: MY_TABBAR_ITEM, badge: '+1')
+
+# system items:
+UITabBarItem.more
+UITabBarItem.favorites
+
+# Most of the UITabBarItem init methods accept the UIView#tag, and so there is
+# support for that in the UITabBarItem factory methods.  Defaults to 0.  The
+# :badge option is supported here as well
+UITabBarItem.featured(tag: MY_TABBAR_ITEM, badge: 10)
+
+# All of the UITabBarSystemItem helpers delegate to the 'UITabBarItem.system'
+# method, which you can call direcly as well.  It accepts :tag and :badge
+# options.
+UITabBarItem.system(:top_rated, tag: MY_ITEM_TAG, badge: 'hi')
+```
+
 ###### NSError
 ```ruby
 # usually, NSError.new doesn't work, because the only initializer for NSError
@@ -822,11 +863,23 @@ Animations ([wiki][Animations Wiki])
 Careful, once you start using these helpers, you'll never go back.
 
 ```ruby
+view.move_to [100.0, 100.0] # origin
+view.center_to [100.0, 100.0] # center
+view.scale_to 2  # double the size, and preserves existing rotation transform
+# view.scale_to 4 -> CGAffineTransformMakeScale(4, 4)
+# view.scale_to [4, 3] -> CGAffineTransformMakeScale(4, 3)
 view.fade_out
 view.slide :left, 100
 view.rotate_to 180.degrees
 view.shake  # great for showing invalid form elements
 view.tumble  # great way to dismiss an alert-like-view
+# tumbles in the other direction (towards the right side instead of left)
+view.tumble(side: :right)
+
+# the complement to 'tumble' is 'tumble_in' - the view starts above the window
+# and drops in with the same kind of animation as 'tumble'.  Before you call
+# this method, set the view.frame to the *destination* location.
+view.tumble_in(side: :right)
 ```
 
 These helpers all delegate to the `UIView.animate` method, which accepts all the
@@ -931,6 +984,10 @@ if input.nan?
   UIAlertView.alert('not a number!')
 else
   number = input.to_number
+  # convert a currency
+  number = input.to_number(NSNumberFormatterCurrencyStyle)
+  # convert from symbol, requires 'sugarcube-constants'
+  number = input.to_number(:currency)
 end
 ```
 
@@ -1077,21 +1134,28 @@ some problems with on RubyMotion (it worked, but not *always*.  Very strange).
 Files
 -----
 
-Methods to find document files, resource files, cache files, and to access
+Methods to find document files, resource files, cache files, temporary files, and to access
 entries out of the Info.plist file.
 
 > `require 'sugarcube-files'`
 
 ```ruby
 # file operations
-"my.plist".exists?   # => NSFileManager.defaultManager.fileExistsAtPath("my.plist")
-"my.plist".document  # => NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true)[0].stringByAppendingPathComponent("my.plist")
-"my.plist".cache  # => NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true)[0].stringByAppendingPathComponent("my.plist")
-"my.plist".remove!  # => NSFileManager.defaultManager.removeItemAtPath("my.plist".document, error: error)  (returns error, if any occurred)
+"my.plist".file_exists?   # => NSFileManager.defaultManager.fileExistsAtPath("my.plist")
+
+"my.plist".remove_file!  # => NSFileManager.defaultManager.removeItemAtPath("my.plist".document, error: error)  (returns error, if any occurred)
+
+"my.plist".document_path  # => NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true)[0].stringByAppendingPathComponent("my.plist")
+"my.plist".cache_path  # => NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true)[0].stringByAppendingPathComponent("my.plist")
+"my.plist".temporary_path  # => NSTemporaryDirectory().stringByAppendingPathComponent("my.plist")
+
+# all of these can be turned into a URL, too
+"my.plist".temporary_path.file_url  # => NSURL.fileURLWithPath("my.plist".temporary_path)
 
 # get the resource path, useful if you include json files or images you manipulate in the app
-"my.plist".resource  # => NSBundle.mainBundle.resourcePath.stringByAppendingPathComponent("my.plist")
-# same, but get a URL instead - often used to display a static HTML page that is stored in resources
+"my.plist".resource_path  # => NSBundle.mainBundle.resourcePath.stringByAppendingPathComponent("my.plist")
+# same, but get a URL instead - often used to display a static HTML page that is stored in resources.
+# getting a path URL from a resource is just a little different from creating a URL from any other type of path
 "index.html".resource_url  # => NSBundle.mainBundle.URLForResource("index", withExtension:"html")
 
 # access data from Info.plist
@@ -1172,7 +1236,7 @@ url = 'http://localhost'.nsurl
 url.nsdata  # => NSData.dataWithContentsOfURL(self)
 
 string_data.nsstring  # => 'String'
-image_data.nsimage  # => whatever 'an image' was
+image_data.uiimage  # => whatever 'an image' was
 ```
 
 NSDate ([wiki][NSDate Wiki])
@@ -1215,8 +1279,9 @@ index_path.to_a  # => [1, 2, ...]
 ```ruby
 'https://github.com'.nsurl
 '/path/to/file'.fileurl
-'https://google.com/search?q=' + 'search terms'.escape_url
-'%20'.unescape_url
+'https://google.com/search?q=' + 'search terms'.escape_url  # => "..?q=search%20terms"
+'%20'.unescape_url  #=> " "
+'nô àccénts!'.remove_accents  # => "no accents!"
 ```
 
 ###### NSURL

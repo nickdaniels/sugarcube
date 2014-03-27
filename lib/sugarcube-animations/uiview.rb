@@ -183,6 +183,41 @@ class UIView
     fade_out(options, &after_remove)
   end
 
+  def scale_to(scale, options={}, more_options={}, &after)
+    if options.is_a? Numeric
+      options = more_options.merge(duration: options)
+    end
+
+    if scale.is_a?(Numeric)
+      scale_x = scale_y = scale
+    else  # this could be an array, or CGSize; either way we'll use []
+      scale_x = scale[0]
+      scale_y = scale[1]
+    end
+
+    options[:after] = after
+
+    animate(options) {
+      radians = Math.atan2(self.transform.b, self.transform.a)
+      # radians = self.valueForKeyPath('layer.transform.rotation.z')
+      rotation_t = CGAffineTransformMakeRotation(radians)
+      scale_t = CGAffineTransformMakeScale(scale_x, scale_y)
+      self.transform = CGAffineTransformConcat(rotation_t, scale_t)
+    }
+  end
+
+  def center_to(center, options={}, more_options={}, &after)
+    if options.is_a? Numeric
+      options = more_options.merge(duration: options)
+    end
+
+    options[:after] = after
+
+    animate(options) {
+      self.center = SugarCube::CoreGraphics::Point(center)
+    }
+  end
+
   def move_to(position, options={}, more_options={}, &after)
     if options.is_a? Numeric
       options = more_options.merge(duration: options)
@@ -291,6 +326,43 @@ class UIView
     return self
   end
 
+  # moves the view off screen, then animates it back on screen.  The movement
+  # off screen happens immediately, so if you provide a `delay:` option, it will
+  # only affect the movement back on screen.
+  def slide_from(direction, options={}, more_options={}, &after)
+    if options.is_a? Numeric
+      size = options
+      options = more_options
+    else
+      size = options[:size]
+    end
+
+    options[:from_current] = false unless options.key?(:from_current)
+    window_size = UIApplication.sharedApplication.windows[0].frame.size
+
+    case direction
+    when :left
+      size ||= window_size.width
+      self.center = CGPoint.new(self.center.x - size, self.center.y)
+      self.delta_to([size, 0], options, &after)
+    when :right
+      size ||= window_size.width
+      self.center = CGPoint.new(self.center.x + size, self.center.y)
+      self.delta_to([-size, 0], options, &after)
+    when :top, :up
+      size ||= window_size.height
+      self.center = CGPoint.new(self.center.x, self.center.y - size)
+      self.delta_to([0, size], options, &after)
+    when :bottom, :down
+      size ||= window_size.height
+      self.center = CGPoint.new(self.center.x, self.center.y + size)
+      self.delta_to([0, -size], options, &after)
+    else
+      raise "Unknown direction #{direction.inspect}"
+    end
+    return self
+  end
+
   # Vibrates the target. You can trick this thing out to do other effects, like:
   # @example
   #   # wiggle
@@ -328,6 +400,8 @@ class UIView
     right = origin + offset
 
     animation = CAKeyframeAnimation.animationWithKeyPath(keypath)
+    # sometimes, because of conflicts with CATiming (or something to that
+    # effect), calling 'duration=' results in a compiler or runtime error.
     animation.send(:'setDuration:', duration)
     animation.repeatCount = repeat
     animation.values = [origin, left, right, origin]
@@ -349,8 +423,23 @@ class UIView
     if options.is_a? Numeric
       default_duration = options
       options = more_options
+      side = options[:side] || :left
+    elsif options.is_a? Symbol
+      side = options
+      options = more_options
+      default_duration = 0.3
     else
       default_duration = 0.3
+      side = options[:side] || :left
+    end
+
+    case side
+      when :left
+        angle = -Math::PI/4
+      when :right
+        angle = Math::PI/4
+      else
+        raise "Unknown direction #{side.inspect}"
     end
 
     options[:duration] ||= default_duration
@@ -380,7 +469,7 @@ class UIView
       height = window.frame.size.height - top
       offset = CGPoint.new(0, height * 1.5)
       offset = CGPointApplyAffineTransform(offset, self.transform)
-      self.transform = CGAffineTransformConcat(self.transform, CGAffineTransformMakeRotation(-Math::PI/4))
+      self.transform = CGAffineTransformConcat(self.transform, CGAffineTransformMakeRotation(angle))
       self.center = CGPointMake(self.center.x + offset.x, self.center.y + offset.y)
     end
   end
@@ -388,12 +477,27 @@ class UIView
   # Moves the view on screen while slowly rotating it.
   #
   # Based on https://github.com/warrenm/AHAlertView/blob/master/AHAlertView/AHAlertView.m
-  def tumble_in(options={}, &after)
+  def tumble_in(options={}, more_options={}, &after)
     if options.is_a? Numeric
       default_duration = options
-      options = {}
+      options = more_options
+      side = options[:side] || :left
+    elsif options.is_a? Symbol
+      side = options
+      options = more_options
+      default_duration = 0.3
     else
       default_duration = 0.3
+      side = options[:side] || :left
+    end
+
+    case side
+      when :left
+        angle = -Math::PI/4
+      when :right
+        angle = Math::PI/4
+      else
+        raise "Unknown direction #{side.inspect}"
     end
 
     reset_transform = self.transform
@@ -408,7 +512,7 @@ class UIView
     height = window.frame.size.height - top
     offset = CGPoint.new(0, height * -1.5)
     offset = CGPointApplyAffineTransform(offset, self.transform)
-    self.transform = CGAffineTransformConcat(self.transform, CGAffineTransformMakeRotation(Math::PI/4))
+    self.transform = CGAffineTransformConcat(self.transform, CGAffineTransformMakeRotation(angle))
     self.center = CGPointMake(self.center.x + offset.x, self.center.y + offset.y)
 
     self.animate(options) do
