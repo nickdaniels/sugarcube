@@ -7,11 +7,11 @@ class Symbol
   end
 
   def uicolor(alpha=nil)
-    if Symbol.uicolors.has_key? self
+    if Symbol.uicolors.has_key?(self) || Symbol.uicolors__deprecated.has_key?(self)
       # iOS colors
       color = UIColor.send(SugarCube.look_in(self, Symbol.uicolors, Symbol.uicolors__deprecated))
 
-      if not alpha.nil?
+      if alpha
         color = color.colorWithAlphaComponent(alpha.to_f)
       end
     elsif Symbol.css_colors_cache.has_key? self
@@ -29,27 +29,31 @@ class Symbol
     color
   end
 
+  def cgcolor(alpha=nil)
+    self.uicolor(alpha).CGColor
+  end
+
   @uicolors__deprecated = {
     darkgray: :dark_gray,
     lightgray: :light_gray,
   }
 
   @uicolors = {
-    black:     :blackColor,
-    blue:      :blueColor,
-    brown:     :brownColor,
-    cyan:      :cyanColor,
+    black:      :blackColor,
+    blue:       :blueColor,
+    brown:      :brownColor,
+    cyan:       :cyanColor,
     dark_gray:  :darkGrayColor,
-    gray:      :grayColor,
-    green:     :greenColor,
+    gray:       :grayColor,
+    green:      :greenColor,
     light_gray: :lightGrayColor,
-    magenta:   :magentaColor,
-    orange:    :orangeColor,
-    purple:    :purpleColor,
-    red:       :redColor,
-    yellow:    :yellowColor,
-    white:     :whiteColor,
-    clear:     :clearColor,
+    magenta:    :magentaColor,
+    orange:     :orangeColor,
+    purple:     :purpleColor,
+    red:        :redColor,
+    yellow:     :yellowColor,
+    white:      :whiteColor,
+    clear:      :clearColor,
 
     light_text: :lightTextColor,
     dark_text:  :darkTextColor,

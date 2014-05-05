@@ -17,6 +17,11 @@ class UIActionSheet
   #     # use one handler for all buttons
   #     UIActionSheet.alert("title", buttons: [...]) { |button| }
   def self.alert(title, options={}, &block)
+    if title.is_a?(NSDictionary)
+      options = title
+      title = options[:title]
+    end
+
     # create the delegate
     delegate = SugarCube::ActionSheetDelegate.new
     delegate.on_default = block
@@ -28,10 +33,10 @@ class UIActionSheet
     args = [title]            # initWithTitle:
     args << delegate          # delegate:
 
-    buttons = []
-    buttons.concat(options[:buttons]) if options[:buttons]
-
+    buttons = (options[:buttons] || []).freeze
     if buttons.empty?
+      buttons = []  # an empty Hash becomes an Array
+
       # cancelButtonTitle:
       buttons << nil
 
@@ -44,33 +49,51 @@ class UIActionSheet
       raise 'If you only have one button, use a :success handler, not :cancel or :destructive'
     end
 
-    # cancelButtonTitle:destructiveButtonTitle:otherButtonTitles:
-    args.concat(buttons.map{ |s| s ? s.localized : nil })
-    args << nil  # otherButtonTitles:..., nil
-
     # the button titles, mapped to how UIActionSheet orders them.  These are
     # passed to the success handler.
     buttons_mapped = {}
+
+    # cancelButtonTitle:destructiveButtonTitle:otherButtonTitles:
+    # uses localized buttons in the actual alert
+    if buttons.is_a?(NSDictionary)
+      button_titles = buttons.keys
+      if buttons.key?(:cancel)
+        args << (buttons[:cancel] && buttons[:cancel].localized)
+      else
+        args << nil
+      end
+      if buttons.key?(:destructive)
+        args << (buttons[:destructive] && buttons[:destructive].localized)
+      else
+        args << nil
+      end
+      args.concat(buttons.select { |k, m| k != :cancel && k != :destructive }.map { |k, m| m && m.localized })
+    else
+      button_titles = buttons
+      args.concat(buttons.map { |m| m && m.localized })
+    end
+    args << nil  # otherButtonTitles:..., nil
+
     if args[2] && args[3]  # cancel && destructive buttons
-      buttons_mapped[0] = buttons[1]                   # destructiveIndex == 0, button == 1
-      buttons_mapped[buttons.length - 1] = buttons[0]  # cancelIndex == last, button == 0
+      buttons_mapped[0] = button_titles[1]                   # destructiveIndex == 0, button == 1
+      buttons_mapped[button_titles.length - 1] = button_titles[0]  # cancelIndex == last, button == 0
       # from first+1 to last-1
-      buttons[2..-1].each_with_index do |button,index|
+      button_titles[2..-1].each_with_index do |button,index|
         buttons_mapped[index + 1] = button
       end
     elsif args[3]  # destructive button
-      buttons_mapped[0] = buttons[1]                   # destructiveIndex == 0, button == 1
+      buttons_mapped[0] = button_titles[1]                   # destructiveIndex == 0, button == 1
       # from first+1 to last-1
       buttons[2..-1].each_with_index do |button,index|
         buttons_mapped[index + 1] = button
       end
     elsif args[2]  # cancel button
-      buttons_mapped[buttons.length - 2] = buttons[0]  # cancelIndex == last, button == 0
-      buttons[2..-1].each_with_index do |button,index|
+      buttons_mapped[buttons.length - 2] = button_titles[0]  # cancelIndex == last, button == 0
+      button_titles[2..-1].each_with_index do |button,index|
         buttons_mapped[index] = button
       end
     else
-      buttons[2..-1].each_with_index do |button,index|
+      button_titles[2..-1].each_with_index do |button,index|
         buttons_mapped[index] = button
       end
     end
@@ -78,6 +101,7 @@ class UIActionSheet
 
     alert = self.alloc
     alert.send('initWithTitle:delegate:cancelButtonTitle:destructiveButtonTitle:otherButtonTitles:', *args)
+
     if options.key?(:style)
       style = options[:style]
       if style.respond_to?(:uiactionstyle)
@@ -85,6 +109,7 @@ class UIActionSheet
       end
       alert.actionSheetStyle = style
     end
+
     if options.fetch(:show, true)
       if options.key?(:from)
         from = options[:from]
@@ -95,7 +120,7 @@ class UIActionSheet
       case from
       when CGRect
         view = UIApplication.sharedApplication.windows[0]
-        alert.showInRect(from, inView: view, animated: true)
+        alert.showFromRect(from, inView: view, animated: true)
       when UIBarButtonItem
         alert.showFromBarButtonItem(from)
       when UIToolbar
@@ -108,6 +133,7 @@ class UIActionSheet
         raise "Unknown :from option #{from.inspect}"
       end
     end
+
     alert
   end
 
@@ -131,7 +157,7 @@ module SugarCube
     attr_accessor :on_destructive
     attr_accessor :on_success
 
-    def actionSheet(alert, didDismissWithButtonIndex:index)
+    def actionSheet(alert, didDismissWithButtonIndex: index)
       handler = nil
       if index == alert.destructiveButtonIndex && on_destructive
         handler = on_destructive
@@ -145,12 +171,14 @@ module SugarCube
       if handler
         if handler.arity == 0
           handler.call
-        elsif handler.arity == 1
-          button = buttons[index]
-          handler.call(button)
         else
           button = buttons[index]
-          handler.call(button, index)
+
+          if handler.arity == 1
+            handler.call(button)
+          else
+            handler.call(button, index)
+          end
         end
       end
 

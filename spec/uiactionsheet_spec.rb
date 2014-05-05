@@ -1,4 +1,4 @@
-describe 'UIActionSheet' do
+describe UIActionSheet do
   tests UIViewController  # this is just needed so that a window is available
 
   before do
@@ -30,6 +30,11 @@ describe 'UIActionSheet' do
     alert.title.should == 'test title'
   end
 
+  it 'should assign the title by options' do
+    alert = UIActionSheet.alert(title: 'test title', show: false)
+    alert.title.should == 'test title'
+  end
+
   it 'should have << method' do
     alert = UIActionSheet.alert('test', show: false)
     -> {
@@ -47,6 +52,55 @@ describe 'UIActionSheet' do
       alert = UIActionSheet.alert('test', show: false, style: value)
       alert.actionSheetStyle.should == value
     end
+  end
+
+  it 'should have :from option that accepts CGRect' do
+    alert = UIActionSheet.alert('test', from: CGRect.new([0, 0], [320, 0]))
+    proper_wait 0.6
+    alert.visible?.should == true
+    alert.dismissWithClickedButtonIndex(alert.firstOtherButtonIndex, animated: false)
+  end
+
+  it 'should have :from option that accepts UIBarButtonItem' do
+    button = UIBarButtonItem.done
+    toolbar = UIToolbar.alloc.initWithFrame(UIScreen.mainScreen.bounds)
+    toolbar.items = [button]
+    window = UIApplication.sharedApplication.windows[0]
+    window << toolbar
+    alert = UIActionSheet.alert('test', from: button)
+    proper_wait 0.6
+    alert.visible?.should == true
+    alert.dismissWithClickedButtonIndex(alert.firstOtherButtonIndex, animated: false)
+  end
+
+  it 'should have :from option that accepts UIToolbar' do
+    view = UIToolbar.alloc.initWithFrame(UIScreen.mainScreen.bounds)
+    window = UIApplication.sharedApplication.windows[0]
+    window << view
+    alert = UIActionSheet.alert('test', from: view)
+    proper_wait 0.6
+    alert.visible?.should == true
+    alert.dismissWithClickedButtonIndex(alert.firstOtherButtonIndex, animated: false)
+  end
+
+  it 'should have :from option that accepts UITabBar' do
+    view = UITabBar.alloc.initWithFrame(UIScreen.mainScreen.bounds)
+    window = UIApplication.sharedApplication.windows[0]
+    window << view
+    alert = UIActionSheet.alert('test', from: view)
+    proper_wait 0.6
+    alert.visible?.should == true
+    alert.dismissWithClickedButtonIndex(alert.firstOtherButtonIndex, animated: false)
+  end
+
+  it 'should have :from option that accepts UIView' do
+    view = UIView.alloc.initWithFrame(UIScreen.mainScreen.bounds)
+    window = UIApplication.sharedApplication.windows[0]
+    window << view
+    alert = UIActionSheet.alert('test', from: view)
+    proper_wait 0.6
+    alert.visible?.should == true
+    alert.dismissWithClickedButtonIndex(alert.firstOtherButtonIndex, animated: false)
   end
 
   it 'should add a button with << method' do
@@ -81,6 +135,7 @@ describe 'UIActionSheet' do
 
     before do
       @touched = nil
+      @touched_index = nil
       @alert = UIActionSheet.alert('test', buttons: ['cancel', 'destructive', 'ok']) { |button, index| @touched, @touched_index = button, index }
       proper_wait 0.6
     end
@@ -109,6 +164,7 @@ describe 'UIActionSheet' do
 
     before do
       @touched = nil
+      @touched_index = nil
       @alert = UIActionSheet.alert('test', buttons: ['cancel', 'destructive']) { |button, index| @touched, @touched_index = button, index }
       proper_wait 0.6
     end
@@ -141,6 +197,7 @@ describe 'UIActionSheet' do
 
     before do
       @touched = nil
+      @touched_index = nil
       @alert = UIActionSheet.alert('test', buttons: ['cancel', nil, 'ok']) { |button, index| @touched, @touched_index = button, index }
       proper_wait 0.6
     end
@@ -173,6 +230,7 @@ describe 'UIActionSheet' do
 
     before do
       @touched = nil
+      @touched_index = nil
       @alert = UIActionSheet.alert('test', buttons: [nil, 'destructive', 'ok']) { |button, index| @touched, @touched_index = button, index }
       proper_wait 0.6
     end
@@ -205,6 +263,7 @@ describe 'UIActionSheet' do
 
     before do
       @touched = nil
+      @touched_index = nil
       @alert = UIActionSheet.alert('test', buttons: [nil, nil, 'test1', 'test2']) { |button, index| @touched, @touched_index = button, index }
       proper_wait 0.6
     end
@@ -213,7 +272,7 @@ describe 'UIActionSheet' do
       @alert.dismissWithClickedButtonIndex(-1, animated: false) if @alert.visible?
     end
 
-    it 'should call block with "cancel" when cancel button is pressed' do
+    it 'should not have cancel button' do
       @alert.cancelButtonIndex.should == -1
     end
 
@@ -236,10 +295,59 @@ describe 'UIActionSheet' do
 
   end
 
+  describe 'with :buttons defined as a hash' do
+
+    before do
+      @touched = nil
+      @touched_index = nil
+      @alert = UIActionSheet.alert('test',
+        buttons: {
+          cancel: 'Cancel',
+          destructive: 'Destructive',
+          test1: 'Test1',
+          test2: 'Test2',
+        }) { |button, index| @touched, @touched_index = button, index }
+      proper_wait 0.6
+    end
+
+    after do
+      # @alert.dismissWithClickedButtonIndex(-1, animated: false) if @alert.visible?
+    end
+
+    it 'should call block with :destructive when cancel button is pressed' do
+      @alert.destructiveButtonIndex.should == 0
+      @alert.dismissWithClickedButtonIndex(@alert.destructiveButtonIndex, animated: false)
+      @touched.should == :destructive
+      @touched_index.should == @alert.destructiveButtonIndex
+    end
+
+    it 'should call block with :cancel when cancel button is pressed' do
+      @alert.cancelButtonIndex.should == 3
+      @alert.dismissWithClickedButtonIndex(@alert.cancelButtonIndex, animated: false)
+      @touched.should == :cancel
+      @touched_index.should == @alert.cancelButtonIndex
+    end
+
+    it 'should call block with :test1 when first button is pressed' do
+      @alert.firstOtherButtonIndex.should == 1
+      @alert.dismissWithClickedButtonIndex(@alert.firstOtherButtonIndex, animated: false)
+      @touched.should == :test1
+      @touched_index.should == @alert.firstOtherButtonIndex
+    end
+
+    it 'should call block with :test2 when second button is pressed' do
+      @alert.dismissWithClickedButtonIndex(@alert.firstOtherButtonIndex + 1, animated: false)
+      @touched.should == :test2
+      @touched_index.should == @alert.firstOtherButtonIndex + 1
+    end
+
+  end
+
   describe 'with all handlers defined' do
 
     before do
       @touched = nil
+      @touched_index = nil
       @alert = UIActionSheet.alert('test',
         buttons: ['cancel', 'destructive', 'test1', 'test2'],
         cancel: ->{ @touched = :cancel },
@@ -276,10 +384,52 @@ describe 'UIActionSheet' do
 
   end
 
+  describe 'with all handlers defined and buttons as a hash' do
+
+    before do
+      @touched = nil
+      @touched_index = nil
+      @alert = UIActionSheet.alert('test',
+        buttons: {cancel: 'cancel', destructive: 'destructive', test1: 'test1', test2: 'test2'},
+        cancel: ->{ @touched = :cancel },
+        destructive: ->{ @touched = :destructive },
+        success: ->(button, index){ @touched, @touched_index = button, index },
+        )
+      proper_wait 0.6
+    end
+
+    it 'should call block with :cancel when cancel button is pressed' do
+      @alert.cancelButtonIndex.should == 3
+      @alert.dismissWithClickedButtonIndex(@alert.cancelButtonIndex, animated: false)
+      @touched.should == :cancel
+    end
+
+    it 'should call block with :destructive when destructive button is pressed' do
+      @alert.destructiveButtonIndex.should == 0
+      @alert.dismissWithClickedButtonIndex(@alert.destructiveButtonIndex, animated: false)
+      @touched.should == :destructive
+    end
+
+    it 'should call block with "test1" when first button is pressed' do
+      @alert.firstOtherButtonIndex.should == 1
+      @alert.dismissWithClickedButtonIndex(@alert.firstOtherButtonIndex, animated: false)
+      @touched.should == :test1
+      @touched_index.should == @alert.firstOtherButtonIndex
+    end
+
+    it 'should call block with "test2" when second button is pressed' do
+      @alert.dismissWithClickedButtonIndex(@alert.firstOtherButtonIndex + 1, animated: false)
+      @touched.should == :test2
+      @touched_index.should == @alert.firstOtherButtonIndex + 1
+    end
+
+  end
+
   describe 'with success handler defined' do
 
     before do
       @touched = nil
+      @touched_index = nil
       @alert = UIActionSheet.alert('test',
         buttons: ['cancel', 'destructive', 'test1', 'test2'],
         success: ->(button, index){ @touched, @touched_index = button, index },

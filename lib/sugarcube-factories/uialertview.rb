@@ -1,22 +1,38 @@
 class UIAlertView
 
-  # UIAlertView.alert("title",
-  #   message: "help!",
-  #   # The first button is considered the 'cancel' button, for the purposes of
-  #   # whether the cancel or success handler gets called
-  #   buttons: %w"Cancel OK No-way",
-  #   cancel: proc{ puts "nevermind" },
-  #   success: proc{ |pressed| puts "pressed: #{pressed}" },
-  #   )
-  #
-  # If you choose
+  # @example
+  #     UIAlertView.alert("title",
+  #       message: "help!",
+  #       # The first button is considered the 'cancel' button, for the purposes of
+  #       # whether the cancel or success handler gets called
+  #       buttons: %w"Cancel OK No-way",
+  #       cancel: proc{ puts "nevermind" },
+  #       success: proc{ |pressed| puts "pressed: #{pressed}" },
+  #       )
+  #     # you can explicitly set the cancel button by using a Hash for the :buttons option
+  #     UIAlertView.alert("title",
+  #       message: "help!",
+  #       # The first button is considered the 'cancel' button, for the purposes of
+  #       # whether the cancel or success handler gets called
+  #       buttons: { cancel: 'Cancel', ok: 'OK', no_way: 'No-way' },
+  #       cancel: proc{ puts "nevermind" },
+  #       success: proc{ |pressed| puts "pressed: #{pressed.inspect}" },
+  #       )  # pressed will be :ok or :no_way
   def self.alert(title, options={}, more_options={}, &block)
-    if options.is_a? String
-      more_options[:message] = options
+    if title.is_a?(NSDictionary)
+      options = title
+      title = options[:title]
+      message = options[:message]
+    elsif options.is_a? String
+      message = options
       options = more_options
+    else
+      message = options[:message]
     end
 
-    # create the delegate
+    # The delegate gets retained here because UIAlertView#delegate is a weak
+    # reference.  It's released in the delegate method
+    # `#didDismissWithButtonIndex(index)`
     delegate = SugarCube::AlertViewDelegate.new
     delegate.on_success = options[:success]
     delegate.on_cancel = options[:cancel]
@@ -24,11 +40,13 @@ class UIAlertView
     delegate.send(:retain)
 
     args = [title]            # initWithTitle:
-    args << options[:message] # message:
+    args << message           # message:
     args << delegate          # delegate:
 
-    buttons = options[:buttons] || []
+    buttons = (options[:buttons] || []).freeze
     if buttons.empty?
+      buttons = []  # an empty Hash becomes an Array
+
       # cancelButtonTitle: is first, so check for cancel
       if options[:cancel]
         buttons << "Cancel"
@@ -45,15 +63,24 @@ class UIAlertView
       raise "If you only have one button, use a :success handler, not :cancel (and definitely not BOTH)"
     end
 
-    # the button titles.  These are passed to the success handler.
-    delegate.buttons = buttons
-
     # uses localized buttons in the actual alert
-    args.concat(buttons.map { |m| m && m.localized })
+    if buttons.is_a?(NSDictionary)
+      button_titles = buttons.keys
+      if buttons.key?(:cancel)
+        args << (buttons[:cancel] && buttons[:cancel].localized)
+      else
+        args << nil
+      end
+      args.concat(buttons.select { |k, m| k != :cancel }.map { |k, m| m && m.localized })
+    else
+      button_titles = buttons
+      args.concat(buttons.map { |m| m && m.localized })
+    end
+    delegate.buttons = button_titles
     args << nil  # otherButtonTitles:..., nil
 
     alert = self.alloc
-    alert.send(:"initWithTitle:message:delegate:cancelButtonTitle:otherButtonTitles:", *args)
+    alert.send("initWithTitle:message:delegate:cancelButtonTitle:otherButtonTitles:", *args)
     if options.key?(:style)
       style = options[:style]
       style = style.uialertstyle if style.respond_to?(:uialertstyle)
@@ -115,6 +142,7 @@ module SugarCube
           # but only send the ones they asked for
           args = args[0...handler.arity]
         end
+
         handler.call(*args)
       end
 
