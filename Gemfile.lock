@@ -1,12 +1,12 @@
 PATH
   remote: .
   specs:
-    sugarcube (1.6.0)
+    sugarcube (2.4.2)
 
 GEM
   remote: https://rubygems.org/
   specs:
-    rake (10.0.4)
+    rake (10.3.2)
 
 PLATFORMS
   ruby

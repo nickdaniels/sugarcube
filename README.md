@@ -3,7 +3,8 @@ SugarCube
 
 Some sugar for your [cocoa](http://rubymotion.com), or your [tea][sweettea].
 
-[![Build Status](https://travis-ci.org/rubymotion/sugarcube.png)](https://travis-ci.org/rubymotion/sugarcube)
+[![Build Status](https://travis-ci.org/rubymotion/sugarcube.svg?branch=master)](https://travis-ci.org/rubymotion/sugarcube)
+[![Version](https://badge.fury.io/rb/sugarcube.svg)](https://rubygems.org/gems/sugarcube)
 
 About
 -----
@@ -157,6 +158,21 @@ quick overview:
   > w 15
   ```
 
+* Changed your mind? undo all adjustments to the object currently selected:
+
+  ```
+  > restore
+  ```
+
+
+* Which element in the tree did I select with adjust? You can make the object selected flash in the simulator:
+
+
+  ```
+  > blink
+  ```
+
+
 Be sure to read more in the [REPL Additions][REPL Wiki] Wiki page.
 
 [REPL Wiki]: https://github.com/rubymotion/sugarcube/wiki/REPL-Additions
@@ -297,7 +313,7 @@ button.on(:touch_up_outside, :touch_cancel) { |event|
 
 # remove handlers
 button.off(:touch, :touch_up_outside, :touch_cancel)
-button.off(:all)
+button.off # all events
 ```
 
 You can only remove handlers by "type", not by the action.  e.g. If you bind
@@ -440,6 +456,8 @@ image.in_rect([[10, 10], [100, 100]])  # get part of an image
 
 image.darken  # => good for "pressed" buttons
 image.darken(brightness: -0.5, saturation: -0.2)  # these are the defaults
+image.gaussian_blur(radius: 5)
+image.inverted
 
 image.rotate(:left)
 image.rotate(:right)
@@ -690,6 +708,8 @@ Options:
     :show => Boolean - Whether to show the action sheet (default: true)
     :from => CGRect | UIBarButtonItem | UIToolbar | UITabBar | UIView (default: first window)
              Where to display the alert.  Mostly relevant on iPad.
+    :view => UIView (default: first window)
+             The view to display the alert when used with :from => CGRect
 
 ```ruby
 # simple
@@ -722,6 +742,34 @@ UIActionSheet.alert('Well, how bout it?',
     help: 'Tell me more'
   }) do |button|
   # button is :cancel, :destructive or :help
+end
+```
+
+###### UIAlertController
+
+Starting with iOS 8.0, UIActionSheet and UIAlertView are deprecated and replaced by UIAlertController.
+
+This is very similar to `UIAlertView.alert` and `UIActionSheet.alert` but you have to pass a `UIViewController` as first argument.
+
+Options:
+
+    UIAlertController.alert(controller, options)
+    UIAlertController.alert(controller, title, options)
+    0 => title => String - title of the action sheet
+    :title => Title of the alert sheet
+    :buttons => [] - List of buttons ([cancel, destructive, others...])
+    :style => Symbol | Fixnum - A symbol (uialertcontrollerstyle) or constant (UIAlertControllerStyle*)
+    :show => Boolean - Whether to show the alert controller (default: true)
+    :from => CGRect | UIBarButtonItem | UIView (default: first window)
+             Where to display the alert.  Mostly relevant on iPad.
+    :view => UIView (default: first window)
+             The view to display the alert when used with :from => CGRect
+
+```ruby
+# simple
+UIAlertController.alert(self, 'This is happening, OK?', buttons: ['Cancel', 'Kill it!', 'Uh, what?']
+  ) do |button|
+  # button is 'Cancel', 'Kill it!' or 'Uh, what?'
 end
 ```
 
@@ -1200,8 +1248,8 @@ some problems with on RubyMotion (it worked, but not *always*.  Very strange).
 Files
 -----
 
-Methods to find document files, resource files, cache files, temporary files, and to access
-entries out of the Info.plist file.
+Methods to find document files, resource files, cache files, temporary files, access
+entries out of the Info.plist file, and write data/arrays/dictionaries to a file.
 
 > `require 'sugarcube-files'`
 
@@ -1226,6 +1274,19 @@ entries out of the Info.plist file.
 
 # access data from Info.plist
 "CFBundleVersion".info_plist  # => NSBundle.mainBundle.infoDictionary["CFBundleVersion"]
+
+# write to file
+[].write_to('array.plist'.document_path)
+array = NSArray.read_from('array.plist'.resource_path)
+
+{}.write_to('dict.plist'.document_path)
+dict = NSDictionary.read_from('dict.plist'.resource_path)
+
+data = UIImagePNGRepresentation('some_image'.uiimage)
+# using sugarcube-nsdata:
+# data = 'some_image'.uiimage.nsdata
+data.write_to('some_image.png'.document_path)
+image_data = NSData.read_from('some_image.png'.document_path)
 ```
 
 Localized
